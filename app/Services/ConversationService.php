@@ -46,7 +46,7 @@ class ConversationService
         {
             return $this->authService->validateEmail($user, $text);
         }
-        if ($user->state = 'ask_code')
+        if ($user->state == 'ask_code')
         {
             return $this->authService->checkCode($user, $text);
         }
