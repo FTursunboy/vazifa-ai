@@ -18,7 +18,7 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name', 'tg_nick', 'telegram_id', 'last_seen'
+        'name', 'tg_nick', 'telegram_id', 'last_seen', 'email', 'daily_request_limit', 'daily_requests_used', 'daily_requests_reset_at', 'state'
     ];
 
     /**
@@ -39,6 +39,9 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'daily_request_limit' => 'integer',
+        'daily_requests_used' => 'integer',
+        'tariff' => 'integer',
     ];
 
     public function conversations() {

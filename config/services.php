@@ -6,5 +6,8 @@ return [
     ],
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN')
+    ],
+    'vazifa' => [
+        'api_key' => env('VAZIFA_API_KEY'),
     ]
 ];
