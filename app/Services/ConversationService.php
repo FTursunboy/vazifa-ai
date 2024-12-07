@@ -37,7 +37,8 @@ class ConversationService
 
 
         if (str_starts_with($text, '/')) {
-            return $this->handleCommand($text,  $userId);
+            $this->handleCommand($text,  $userId);
+            return true;
         }
 
         $user = $this->userService->findOrCreateFromTelegram($update);
