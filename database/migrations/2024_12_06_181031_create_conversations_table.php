@@ -15,6 +15,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->string('thread_id');
+            $table->string('status');
+            $table->string('last_run_id')->nullable();
+
             $table->timestamps();
         });
     }

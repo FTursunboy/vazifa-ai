@@ -2,19 +2,158 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Conversation;
+use App\Models\Message;
 use App\Services\ConversationService;
+use App\Services\OpenAIService;
+use App\Services\TelegramService;
+use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 // app/Http/Controllers/WebhookController.php
-class WebhookController extends Controller {
-    public function __construct(
-        private ConversationService $conversationService
-    ) {}
+class WebhookController extends Controller
+{
+    private $openAIService;
+    private $telegramService;
 
-    public function handleTelegramWebhook(Request $request) :JsonResponse
+    private UserService $userService;
+
+    public function __construct(OpenAIService $openAIService, TelegramService $telegramService, UserService $userService)
     {
-        $conversation = $this->conversationService->processIncomingMessage($request->all());
-        return response()->json(['status' => 'ok', 'conversation_id' => $conversation->id]);
+        $this->openAIService = $openAIService;
+        $this->telegramService = $telegramService;
+        $this->userService = $userService;
     }
+
+    public function handle(Request $request)
+    {
+        $update = $request->all();
+
+        if (!isset($update['message']['text'])) {
+            return response()->json(['status' => 'ok']);
+        }
+
+        $userId = $update['message']['from']['id'];
+        $chatId = $update['message']['chat']['id'];
+        $text = $update['message']['text'];
+
+        $user = $this->userService->findOrCreateFromTelegram($update);
+
+        $conversation = Conversation::where('user_id', $user->id)->first();
+
+        if (!$conversation) {
+            $conversation = Conversation::create([
+                'user_id' => $user->id,
+                'thread_id' => $this->openAIService->createThread($user->id, $update['message']['chat']['id']),
+                'status' => 'ready'
+            ]);
+        }
+        if ($conversation->status === 'processing') {
+            $this->telegramService->sendMessage(
+                $chatId,
+                "⏳ Подождите, пожалуйста. Обрабатываю предыдущий запрос..."
+            );
+            return response()->json(['status' => 'ok']);
+        }
+        $response = $this->telegramService->sendMessage(
+            $chatId,
+            "Бот изучает ваш вопрос"
+        );
+
+
+        $userMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'content' => $text,
+            'role' => 'user',
+            'message_id' => $response['result']['message_id']
+        ]);
+
+        $this->telegramService->sendTypingAction($chatId);
+
+        $conversation->update(['status' => 'processing']);
+
+        $messageId = $this->openAIService->addMessageToThread(
+            $conversation->thread_id,
+            $text
+        );
+
+        $runId = $this->openAIService->createRun(
+            $conversation->thread_id,
+            config('services.openai.assistant_id')
+        );
+
+        $conversation->update(['last_run_id' => $runId]);
+
+        dispatch(function() use ($conversation, $chatId) {
+            $this->processRun($conversation, $chatId);
+        });
+
+        return response()->json(['status' => 'ok']);
+    }
+    private function processRun(Conversation $conversation, int $chatId)
+    {
+        $maxAttempts = 20;
+        $attempt = 0;
+
+        while ($attempt < $maxAttempts) {
+            $status = $this->openAIService->checkRunStatus(
+                $conversation->thread_id,
+                $conversation->last_run_id
+            );
+
+            if ($status === 'completed') {
+                $messages = $this->openAIService->getThreadMessages($conversation->thread_id);
+                $assistantMessage = collect($messages)
+                    ->where('role', 'assistant')
+                    ->first();
+
+                if ($assistantMessage) {
+                    $botMessageText = $assistantMessage['content'][0]['text']['value'];
+
+                    // Получаем ID отправленного сообщения
+                    $lastUserMessage = $conversation->messages()
+                        ->where('role', 'user')
+                        ->latest()
+                        ->first();
+
+                    if ($lastUserMessage) {
+                        $this->telegramService->editMessageText($chatId, $lastUserMessage->message_id, $botMessageText);
+                    }
+
+                    Message::create([
+                        'conversation_id' => $conversation->id,
+                        'content' => $botMessageText,
+                        'role' => 'assistant',
+                        'is_bot_message' => true,
+                        'message_id' => $lastUserMessage->message_id
+                    ]);
+                }
+
+                $conversation->update(['status' => 'ready']);
+                break;
+            }
+
+            if (in_array($status, ['failed', 'cancelled'])) {
+                $this->telegramService->sendMessage(
+                    $chatId,
+                    "❌ Произошла ошибка при обработке запроса"
+                );
+                $conversation->update(['status' => 'ready']);
+                break;
+            }
+
+            sleep(1);
+            $attempt++;
+        }
+
+        if ($attempt >= $maxAttempts) {
+            $this->telegramService->sendMessage(
+                $chatId,
+                "⏰ Превышено время ожидания ответа"
+            );
+            $conversation->update(['status' => 'ready']);
+        }
+    }
+
 }

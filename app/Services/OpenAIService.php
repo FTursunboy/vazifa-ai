@@ -4,45 +4,71 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 
-class OpenAIService {
-    private $client;
+class OpenAIService
+{
+    private $apiKey;
+    private $baseUrl = 'https://api.openai.com/v1';
 
-    public function __construct() {
-        $this->client = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('services.openai.api_key'),
-            'OpenAI-Beta' => 'assistants=v2 ',
-            'Content-Type' => 'application/json'
-        ]);
+    public function __construct()
+    {
+        $this->apiKey = config('services.openai.api_key');
     }
 
-    public function createThread(): string {
-        $response = $this->client->post('https://api.openai.com/v1/threads');
+    public function createThread(int $userId, int $chatId)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'OpenAI-Beta' => 'assistants=v2',
+            'Content-Type' => 'application/json'
+        ])->post($this->baseUrl . '/threads');
+
         return $response->json('id');
     }
 
-    public function addMessage(string $threadId, string $content): string {
-        $response = $this->client->post("https://api.openai.com/v1/threads/{$threadId}/messages", [
+    public function addMessageToThread(string $threadId, string $content)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'OpenAI-Beta' => 'assistants=v2',
+            'Content-Type' => 'application/json'
+        ])->post($this->baseUrl . "/threads/{$threadId}/messages", [
             'role' => 'user',
             'content' => $content
         ]);
+
         return $response->json('id');
     }
 
-    public function createRun(string $threadId, string $assistantId): string {
-        $response = $this->client->post("https://api.openai.com/v1/threads/{$threadId}/runs", [
+    public function createRun(string $threadId, string $assistantId)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'OpenAI-Beta' => 'assistants=v2',
+            'Content-Type' => 'application/json'
+        ])->post($this->baseUrl . "/threads/{$threadId}/runs", [
             'assistant_id' => $assistantId
         ]);
+
         return $response->json('id');
     }
 
-    public function checkRunStatus(string $threadId, string $runId): string {
-        $response = $this->client->get("https://api.openai.com/v1/threads/{$threadId}/runs/{$runId}");
+    public function checkRunStatus(string $threadId, string $runId)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'OpenAI-Beta' => 'assistants=v2'
+        ])->get($this->baseUrl . "/threads/{$threadId}/runs/{$runId}");
+
         return $response->json('status');
     }
 
-    public function getLastMessage(string $threadId): ?string {
-        $response = $this->client->get("https://api.openai.com/v1/threads/{$threadId}/messages");
-        $messages = $response->json('data');
-        return $messages[0]['content'][0]['text']['value'] ?? null;
+    public function getThreadMessages(string $threadId)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'OpenAI-Beta' => 'assistants=v2'
+        ])->get($this->baseUrl . "/threads/{$threadId}/messages");
+
+        return $response->json('data');
     }
 }

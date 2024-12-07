@@ -10,6 +10,6 @@ class Message extends Model
     use HasFactory;
 
     protected $fillable = [
-        'conversation_id', 'role', 'content', 'openai_message_id', 'telegram_message_id'
+        'conversation_id', 'role', 'content', 'openai_message_id', 'telegram_message_id', 'message_id'
     ];
 }

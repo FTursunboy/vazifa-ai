@@ -16,8 +16,8 @@ return new class extends Migration
             $table->unsignedBigInteger('conversation_id');
             $table->string('role');
             $table->text('content');
-            $table->string('openai_message_id')->nullable();
-            $table->unsignedBigInteger('telegram_message_id')->nullable();
+            $table->string('message_id');
+            $table->boolean('is_bot_message')->default(false);
             $table->timestamps();
         });
     }
