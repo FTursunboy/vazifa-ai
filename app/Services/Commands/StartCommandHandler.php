@@ -2,6 +2,7 @@
 
 namespace App\Services\Commands;
 
+use App\Models\Message;
 use App\Models\User;
 use App\Services\TelegramService;
 use Illuminate\Support\Facades\Http;

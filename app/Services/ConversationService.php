@@ -42,26 +42,26 @@ class ConversationService
 
         $user = $this->userService->findOrCreateFromTelegram($update);
 
-        if ($user->state == 'ask_email')
-        {
-            return $this->authService->validateEmail($user, $text);
-        }
-        if ($user->state = 'ask_code')
-        {
-            return $this->authService->checkCode($user, $text);
-        }
-
-        if (!$this->authService->isUserAuthorized($user)) {
-            return $this->authService->requestAuthorization($userId, $user);
-        }
-
-        if (!$this->authService->checkRequestLimit($user)) {
-            $this->telegramService->sendMessage(
-                $userId,
-                "Вы исчерпали дневной лимит запросов. Пожалуйста, вернитесь завтра."
-            );
-            return true;
-        }
+//        if ($user->state == 'ask_email')
+//        {
+//            return $this->authService->validateEmail($user, $text);
+//        }
+//        if ($user->state = 'ask_code')
+//        {
+//            return $this->authService->checkCode($user, $text);
+//        }
+//
+//        if (!$this->authService->isUserAuthorized($user)) {
+//            return $this->authService->requestAuthorization($userId, $user);
+//        }
+//
+//        if (!$this->authService->checkRequestLimit($user)) {
+//            $this->telegramService->sendMessage(
+//                $userId,
+//                "Вы исчерпали дневной лимит запросов. Пожалуйста, вернитесь завтра."
+//            );
+//            return true;
+//        }
 
         $conversation = $this->getOrCreateConversation($user);
 
