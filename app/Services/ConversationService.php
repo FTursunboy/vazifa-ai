@@ -37,16 +37,18 @@ class ConversationService
 
 
         if (str_starts_with($text, '/')) {
-            return $this->handleCommand($text,  $userId);
+            $this->handleCommand($text,  $userId);
+            return true;
         }
 
         $user = $this->userService->findOrCreateFromTelegram($update);
-
+//
+//
 //        if ($user->state == 'ask_email')
 //        {
 //            return $this->authService->validateEmail($user, $text);
 //        }
-//        if ($user->state = 'ask_code')
+//        if ($user->state == 'ask_code')
 //        {
 //            return $this->authService->checkCode($user, $text);
 //        }

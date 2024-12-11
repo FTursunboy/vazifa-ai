@@ -69,13 +69,13 @@ class AuthService
             $userData = $response->json();
 
             $user->email = $email;
-            $user->state = 'registered';
+            $user->state = 'ask_code';
+            $user->code = '1111';
+            $user->tariff = $userData['tariff'] ?? 30;
+
+            $this->telegramService->sendMessage($user->telegram_id, 'Вам на почту отправлен код верификации, отправьте ее мне пожалуйста');
+
             $user->save();
-
-            $this->updateUserRequestLimit($user, $userData['tariff']);
-
-            $this->telegramService->sendMessage($user->telegram_id, "Поздравляю, Вы успешно авторизовались. У вас {$user->daily_request_limit} в день");
-            $this->telegramService->sendMessage($user->telegram_id, "Можете задавать свои вопросы");
 
             return true;
         } catch (\Exception $e) {
@@ -91,7 +91,7 @@ class AuthService
     private function updateUserRequestLimit(User $user, string $tariff) :void
     {
         switch ($tariff) {
-            case '3':
+            case 3:
                 $user->daily_request_limit = 50;
                 break;
             default:
@@ -101,6 +101,7 @@ class AuthService
 
         $user->daily_requests_reset_at = now()->addDay();
         $user->daily_requests_used = 0;
+        $user->state = 'finished';
         $user->save();
     }
 
@@ -109,8 +110,20 @@ class AuthService
         $user->increment('daily_requests_used');
     }
 
-    public function checkCode(User $user, string $email)
+    public function checkCode(User $user, string $code) :bool
     {
+        $verified = $user->code == $code;
 
+        if(!$verified) {
+            $this->telegramService->sendMessage($user->telegram_id, 'Не правильный код подтверждения, попробуйте еще раз');
+            return false;
+        }
+
+        $this->updateUserRequestLimit($user, $user->tariff);
+
+        $this->telegramService->sendMessage($user->telegram_id, "Поздравляю, Вы успешно авторизовались. У вас {$user->daily_request_limit} запросов в день");
+        $this->telegramService->sendMessage($user->telegram_id, "Можете задавать свои вопросы");
+
+        return true;
     }
 }
