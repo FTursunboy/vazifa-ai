@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,4 +16,23 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+Route::get('/webhook', function () {
+    $token = env('TELEGRAM_BOT_TOKEN');
+    $webhookUrl = 'https://f65b-95-142-94-22.ngrok-free.app/api/telegram/webhook';
+
+    $response = Http::get("https://api.telegram.org/bot{$token}/setWebhook", [
+        'url' => $webhookUrl,
+    ]);
+
+    return $response->json();
+});
+
+Route::get('/deleteWebhook', function () {
+    $token = env('TELEGRAM_BOT_TOKEN');
+
+    $response = Http::get("https://api.telegram.org/bot{$token}/deleteWebhook");
+
+    return $response->json();
 });

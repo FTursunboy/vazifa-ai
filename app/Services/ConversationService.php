@@ -26,7 +26,7 @@ class ConversationService
         $this->authService = $authService;
     }
 
-    public function handleWebhook(array $update) :bool
+    public function handleWebhook(array $update): bool
     {
         if (!isset($update['message']['text'])) {
             return false;
@@ -36,57 +36,29 @@ class ConversationService
         $text = $update['message']['text'];
 
 
+        $user = $this->userService->findOrCreateFromTelegram($update);
+
         if (str_starts_with($text, '/')) {
             $this->handleCommand($text,  $userId);
             return true;
         }
 
-        $user = $this->userService->findOrCreateFromTelegram($update);
-//
-//
-//        if ($user->state == 'ask_email')
-//        {
-//            return $this->authService->validateEmail($user, $text);
-//        }
-//        if ($user->state == 'ask_code')
-//        {
-//            return $this->authService->checkCode($user, $text);
-//        }
-//
-//        if (!$this->authService->isUserAuthorized($user)) {
-//            return $this->authService->requestAuthorization($userId, $user);
-//        }
-//
-//        if (!$this->authService->checkRequestLimit($user)) {
-//            $this->telegramService->sendMessage(
-//                $userId,
-//                "Вы исчерпали дневной лимит запросов. Пожалуйста, вернитесь завтра."
-//            );
-//            return true;
-//        }
+        if (!$user->is_authed) {
+            return $this->userService->handleUserAuthorization($user, $text, $userId);
+        }
 
-        $conversation = $this->getOrCreateConversation($user);
-
-        if ($conversation->status === 'processing') {
+        if (!$this->authService->checkRequestLimit($user)) {
             $this->telegramService->sendMessage(
                 $userId,
-                "⏳ Подождите, пожалуйста. Обрабатываю предыдущий запрос..."
+                "Вы исчерпали дневной лимит запросов. Пожалуйста, вернитесь завтра."
             );
             return true;
         }
 
-        $response = $this->telegramService->sendMessage(
-            $userId,
-            "Бот изучает ваш вопрос"
-        );
-
-        $userMessage = $this->createUserMessage($conversation, $text, $response);
-        $this->telegramService->sendTypingAction($userId);
-        $conversation->update(['status' => 'processing']);
-
-        $this->processOpenAIRequest($conversation, $userId, $text);
 
         $this->authService->incrementRequestCount($user);
+
+        $this->processUserMessage($user, $text, $userId);
 
         return true;
     }
@@ -121,6 +93,30 @@ class ConversationService
         }
 
         return $conversation;
+    }
+
+    private function processUserMessage(User $user, string $text, int $userId)
+    {
+        $conversation = $this->userService->getOrCreateConversation($user);
+
+        if ($conversation->status === 'processing') {
+            $this->telegramService->sendMessage(
+                $userId,
+                "⏳ Подождите, пожалуйста. Обрабатываю предыдущий запрос..."
+            );
+            return;
+        }
+
+        $response = $this->telegramService->sendMessage(
+            $userId,
+            "Бот изучает ваш вопрос"
+        );
+
+        $this->userService->createUserMessage($conversation, $text, $response);
+        $this->telegramService->sendTypingAction($userId);
+        $conversation->update(['status' => 'processing']);
+
+        $this->processOpenAIRequest($conversation, $userId, $text);
     }
 
     private function createUserMessage(Conversation $conversation, string $text, array $response)
