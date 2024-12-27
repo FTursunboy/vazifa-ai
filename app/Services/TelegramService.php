@@ -71,18 +71,23 @@ class TelegramService
 
         return $text;
     }
+
+
+    private function formatText(string $text): string {
+        return preg_replace('/(\d+\.\s*)([^-]*?)(\s*-)/', '$1**$2**$3', $text);
+    }
+
     private function escapeMarkdownV2(string $text): string
     {
-        // Экранируем специальные символы, кроме тех, что используются для форматирования
+        $text = $this->formatText($text);
         $specialChars = ['[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
         $escapedText = str_replace($specialChars, array_map(fn($char) => '\\' . $char, $specialChars), $text);
 
-        // Находим текст между ** и экранируем внутри него все кроме самих **
-        $escapedText = preg_replace_callback('/\*\*(.*?)\*\*/u', function($matches) {
+          $escapedText = preg_replace_callback('/\*\*(.*?)\*\*/u', function($matches) {
             $innerText = $matches[1];
             $specialChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
             $escapedInner = str_replace($specialChars, array_map(fn($char) => '\\' . $char, $specialChars), $innerText);
-            return "**" . $escapedInner . "**";
+            return "*" . $escapedInner . "*";
         }, $escapedText);
 
         return $escapedText;
