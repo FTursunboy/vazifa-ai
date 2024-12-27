@@ -19,7 +19,7 @@ class StartCommandHandler
 
     public function run(int $chatId)
     {
-        $welcomeMessage = "Привет! 👋 Я ваш персональный ассистент.";
+        $welcomeMessage = "Привет! 👋 Я ваш персональный ассистент. Чтобы пользоваться ботом, пожалуйста, зарегистрируйтесь.";
 
         $this->telegramService->sendMessage($chatId, $welcomeMessage);
 
