@@ -18,8 +18,7 @@ class StartCommandHandler
 
     public function run(int $chatId)
     {
-        $welcomeMessage = "Привет! 👋 Я ваш персональный ассистент. " .
-            "Для начала работы, пожалуйста, предоставьте вашу электронную почту.";
+        $welcomeMessage = "Привет! 👋 Я ваш персональный ассистент.";
 
         $this->telegramService->sendMessage($chatId, $welcomeMessage);
 
