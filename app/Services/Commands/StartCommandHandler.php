@@ -24,8 +24,11 @@ class StartCommandHandler
         $this->telegramService->sendMessage($chatId, $welcomeMessage);
 
         $userService = new UserService($this->telegramService);
+
         $user = User::where('telegram_id', $chatId)->first();
-        $userService->handleUserAuthorization($user, '', $chatId);
+        if (!$user->is_atuhed) {
+            $userService->handleUserAuthorization($user, '', $chatId);
+        }
         return ['status' => 'ok'];
     }
 }

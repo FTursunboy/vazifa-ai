@@ -24,7 +24,7 @@ class UserService
             ['telegram_id' => $telegramData['message']['from']['id']],
             [
                 'tg_name' => trim(($telegramData['message']['from']['first_name'] ?? '') . ' ' . ($telegramData['message']['from']['last_name'] ?? '')),
-                'tg_nick' => $telegramData['message']['from']['username'] ?? null, ,
+                'tg_nick' => $telegramData['message']['from']['username'] ?? null ,
                 'last_seen' => now(),
                 'is_authed' => false,
                 'state' => 'new',
