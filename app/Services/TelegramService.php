@@ -16,12 +16,37 @@ class TelegramService
         $this->baseUrl = "https://api.telegram.org/bot{$this->botToken}";
     }
 
-    public function sendMessage(int $chatId, string $text)
+    public function sendMessage(int $chatId, string $text, array $keyboard = null)
     {
-        return Http::post("{$this->baseUrl}/sendMessage", [
+        $formattedText = $this->escapeMarkdown($text);
+
+        $data = [
             'chat_id' => $chatId,
-            'text' => $text
-        ])->json();
+            'text' => $formattedText,
+            'parse_mode' => 'MarkdownV2',
+        ];
+
+        if ($keyboard) {
+            $data['reply_markup'] = json_encode($keyboard);
+        }
+
+        return Http::post("{$this->baseUrl}/sendMessage", $data)->json();
+    }
+
+    public function sendContactRequest(int $chatId, string $text)
+    {
+        $keyboard = [
+            'keyboard' => [[
+                [
+                    'text' => 'Поделиться номером телефона',
+                    'request_contact' => true
+                ]
+            ]],
+            'resize_keyboard' => true,
+            'one_time_keyboard' => true
+        ];
+
+        return $this->sendMessage($chatId, $text, $keyboard);
     }
 
     public function sendTypingAction(int $chatId)
@@ -32,14 +57,50 @@ class TelegramService
         ]);
     }
 
+    private function escapeMarkdown(string $text): string
+    {
+        // Сначала сохраняем части с {{BOLD}} маркерами
+        $text = preg_replace('/\{\{BOLD\}\}(.*?)\{\{\/BOLD\}\}/', '{{PRESERVED}}$1{{/PRESERVED}}', $text);
+
+        // Экранируем специальные символы
+        $specialChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+        $text = str_replace($specialChars, array_map(fn($char) => "\\$char", $specialChars), $text);
+
+        // Заменяем сохраненные маркеры на markdown жирный текст
+        $text = preg_replace('/\{\{PRESERVED\}\}(.*?)\{\{\/PRESERVED\}\}/', '**$1**', $text);
+
+        return $text;
+    }
+    private function escapeMarkdownV2(string $text): string
+    {
+        // Экранируем специальные символы, кроме тех, что используются для форматирования
+        $specialChars = ['[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+        $escapedText = str_replace($specialChars, array_map(fn($char) => '\\' . $char, $specialChars), $text);
+
+        // Находим текст между ** и экранируем внутри него все кроме самих **
+        $escapedText = preg_replace_callback('/\*\*(.*?)\*\*/u', function($matches) {
+            $innerText = $matches[1];
+            $specialChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+            $escapedInner = str_replace($specialChars, array_map(fn($char) => '\\' . $char, $specialChars), $innerText);
+            return "**" . $escapedInner . "**";
+        }, $escapedText);
+
+        return $escapedText;
+    }
+
+    /**
+     * Редактирование текста сообщения
+     */
     public function editMessageText(int $chatId, int $messageId, string $text)
     {
+        $escapedText = $this->escapeMarkdownV2($text);
+
         return Http::post("{$this->baseUrl}/editMessageText", [
             'chat_id' => $chatId,
             'message_id' => $messageId,
-            'text' => $text
+            'text' => $escapedText,
+            'parse_mode' => 'MarkdownV2'
         ])->json();
     }
-
 
 }

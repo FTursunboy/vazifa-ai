@@ -15,11 +15,12 @@ class ConversationService
     private $authService;
 
     public function __construct(
-        OpenAIService $openAIService,
+        OpenAIService   $openAIService,
         TelegramService $telegramService,
-        UserService $userService,
-        AuthService $authService
-    ) {
+        UserService     $userService,
+        AuthService     $authService
+    )
+    {
         $this->openAIService = $openAIService;
         $this->telegramService = $telegramService;
         $this->userService = $userService;
@@ -28,6 +29,18 @@ class ConversationService
 
     public function handleWebhook(array $update): bool
     {
+        if (isset($update['message']['contact'])) {
+            $userId = $update['message']['from']['id'];
+            $contact = $update['message']['contact'];
+            $user = $this->userService->findOrCreateFromTelegram($update);
+
+            $user->phone = $contact['phone_number'];
+            $user->save();
+
+            $this->telegramService->sendMessage($userId, 'Пожалуйста, введите вашу почту');
+            return true;
+        }
+
         if (!isset($update['message']['text'])) {
             return false;
         }
@@ -35,11 +48,10 @@ class ConversationService
         $userId = $update['message']['from']['id'];
         $text = $update['message']['text'];
 
-
         $user = $this->userService->findOrCreateFromTelegram($update);
 
         if (str_starts_with($text, '/')) {
-            $this->handleCommand($text,  $userId);
+            $this->handleCommand($text, $userId);
             return true;
         }
 
@@ -129,7 +141,7 @@ class ConversationService
         ]);
     }
 
-    private function processOpenAIRequest(Conversation $conversation, int $chatId, string $text) :void
+    private function processOpenAIRequest(Conversation $conversation, int $chatId, string $text): void
     {
         $this->openAIService->addMessageToThread(
             $conversation->thread_id,
@@ -143,12 +155,12 @@ class ConversationService
 
         $conversation->update(['last_run_id' => $runId]);
 
-        dispatch(function() use ($conversation, $chatId) {
+        dispatch(function () use ($conversation, $chatId) {
             $this->processRun($conversation, $chatId);
         });
     }
 
-    private function processRun(Conversation $conversation, int $chatId) :void
+    private function processRun(Conversation $conversation, int $chatId): void
     {
         $maxAttempts = 20;
         $attempt = 0;
@@ -176,7 +188,7 @@ class ConversationService
         $this->handleRunTimeout($conversation, $chatId, $attempt, $maxAttempts);
     }
 
-    private function handleCompletedRun(Conversation $conversation, int $chatId) :void
+    private function handleCompletedRun(Conversation $conversation, int $chatId): void
     {
         $messages = $this->openAIService->getThreadMessages($conversation->thread_id);
         $assistantMessage = collect($messages)
@@ -206,7 +218,7 @@ class ConversationService
         $conversation->update(['status' => 'ready']);
     }
 
-    private function handleFailedRun(Conversation $conversation, int $chatId) :void
+    private function handleFailedRun(Conversation $conversation, int $chatId): void
     {
         $this->telegramService->sendMessage(
             $chatId,
@@ -215,7 +227,7 @@ class ConversationService
         $conversation->update(['status' => 'ready']);
     }
 
-    private function handleRunTimeout(Conversation $conversation, int $chatId, int $attempt, int $maxAttempts) :void
+    private function handleRunTimeout(Conversation $conversation, int $chatId, int $attempt, int $maxAttempts): void
     {
         if ($attempt >= $maxAttempts) {
             $this->telegramService->sendMessage(

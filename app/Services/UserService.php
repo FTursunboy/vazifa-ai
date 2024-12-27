@@ -39,12 +39,11 @@ class UserService
             'name' => 'введите ваше имя',
             'position' => 'введите вашу должность',
             'workplace' => 'введите ваше место работы',
-            'phone' => 'введите ваш номер телефона',
+            'phone' => 'поделитесь своим номером телефона',
             'email' => 'введите вашу электронную почту'
         ];
 
-        if ($user->state == 'new')
-        {
+        if ($user->state == 'new') {
             $this->telegramService->sendMessage($userId, "Пожалуйста, {$requiredFields['name']}.");
             $user->state = 'ask_name';
             $user->save();
@@ -53,21 +52,30 @@ class UserService
 
         foreach ($requiredFields as $field => $fieldPrompt) {
             if (empty($user->{$field})) {
+
+
+                if ($field === 'phone') {
+                    $this->telegramService->sendContactRequest($userId, "Пожалуйста, поделитесь своим номером телефона");
+                    $user->state = $field;
+                    $user->save();
+                    return true;
+                }
                 if (!$this->validateField($field, $text)) {
                     $this->telegramService->sendMessage($userId, "Неверный формат данных");
                     return true;
                 }
 
-
-
                 $user->{$field} = $text;
                 $user->state = $field;
-
                 $user->save();
 
                 $nextField = $this->getNextEmptyField($user, array_keys($requiredFields));
                 if ($nextField) {
-                    $this->telegramService->sendMessage($userId, "Пожалуйста, {$requiredFields[$nextField]}.");
+                    if ($nextField === 'phone') {
+                        $this->telegramService->sendContactRequest($userId, "Пожалуйста, поделитесь своим номером телефона");
+                    } else {
+                        $this->telegramService->sendMessage($userId, "Пожалуйста, {$requiredFields[$nextField]}.");
+                    }
                 } else {
                     $user->is_authed = true;
                     $user->save();
@@ -83,7 +91,6 @@ class UserService
 
         return false;
     }
-
     private function getNextEmptyField(User $user, array $fields): ?string
     {
         foreach ($fields as $field) {
