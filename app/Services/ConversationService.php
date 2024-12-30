@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ConversationService
 {
@@ -152,6 +153,8 @@ class ConversationService
             $conversation->thread_id,
             config('services.openai.assistant_id')
         );
+
+        Log::error(config('services.openai.assistant_id'));
 
         $conversation->update(['last_run_id' => $runId]);
 
