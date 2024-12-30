@@ -26,4 +26,11 @@ class WebhookController extends Controller
             $this->conversationService->handleWebhook($request->all())
         );
     }
+
+    public function handleNewBot(Request $request)
+    {
+        return response()->json(
+            $this->conversationService->handleWebhook($request->all())
+        );
+    }
 }
