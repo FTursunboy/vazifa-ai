@@ -49,6 +49,15 @@ class TelegramService
         return $this->sendMessage($chatId, $text, $keyboard);
     }
 
+    public function removeKeyboard(int $chatId, string $text)
+    {
+        $keyboard = [
+            'remove_keyboard' => true
+        ];
+
+        return $this->sendMessage($chatId, $text, $keyboard);
+    }
+
     public function sendTypingAction(int $chatId)
     {
         Http::post("{$this->baseUrl}/sendChatAction", [

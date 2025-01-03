@@ -37,8 +37,7 @@ class ConversationService
 
             $user->phone = $contact['phone_number'];
             $user->save();
-
-            $this->telegramService->sendMessage($userId, 'Пожалуйста, введите вашу почту');
+            $this->telegramService->removeKeyboard($userId, 'Пожалуйста, введите вашу почту');
             return true;
         }
 
@@ -154,7 +153,6 @@ class ConversationService
             config('services.openai.assistant_id')
         );
 
-        Log::error(config('services.openai.assistant_id'));
 
         $conversation->update(['last_run_id' => $runId]);
 

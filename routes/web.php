@@ -20,7 +20,7 @@ Route::get('/', function () {
 
 Route::get('/webhook', function () {
     $token = env('TELEGRAM_BOT_TOKEN');
-    $webhookUrl = 'https://testt.shamcrm.com/api/telegram/webhook';
+    $webhookUrl = env('WEBHOOK_URL');
 
     $response = Http::get("https://api.telegram.org/bot{$token}/setWebhook", [
         'url' => $webhookUrl,
@@ -31,7 +31,6 @@ Route::get('/webhook', function () {
 
 Route::get('/deleteWebhook', function () {
     $token = env('TELEGRAM_BOT_TOKEN');
-
     $response = Http::get("https://api.telegram.org/bot{$token}/deleteWebhook");
 
     return $response->json();
