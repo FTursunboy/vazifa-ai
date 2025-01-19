@@ -117,4 +117,16 @@ class TelegramService
         ])->json();
     }
 
+    public function sendKeyboard(int $chatId, string $text, array $keyboard)
+    {
+        $data = [
+            'chat_id' => $chatId,
+            'text' => $this->escapeMarkdown($text),
+            'parse_mode' => 'MarkdownV2',
+            'reply_markup' => json_encode($keyboard),
+        ];
+
+        return Http::post("{$this->baseUrl}/sendMessage", $data)->json();
+    }
+
 }

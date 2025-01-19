@@ -36,7 +36,9 @@ class ConversationService
             $user = $this->userService->findOrCreateFromTelegram($update);
 
             $user->phone = $contact['phone_number'];
+            $user->state = 'ask_email'; // Переходим к следующему шагу
             $user->save();
+
             $this->telegramService->removeKeyboard($userId, 'Пожалуйста, введите вашу почту');
             return true;
         }

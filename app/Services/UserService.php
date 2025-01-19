@@ -37,31 +37,91 @@ class UserService
     {
         $requiredFields = [
             'name' => 'введите ваше имя',
-            'position' => 'введите вашу должность',
-            'workplace' => 'введите ваше место работы',
-            'phone' => 'поделитесь своим номером телефона',
-            'email' => 'введите вашу электронную почту'
+            'user_type' => 'укажите ваш тип: соискатель или работодатель',
         ];
 
-        if ($user->state == 'new') {
+        if ($user->state === 'new') {
             $this->telegramService->sendMessage($userId, "Пожалуйста, {$requiredFields['name']}.");
             $user->state = 'ask_name';
             $user->save();
             return true;
         }
 
+        if ($user->state === 'ask_name' && empty($user->name)) {
+            $user->name = $text;
+            $user->state = 'ask_user_type';
+
+            // Отправляем кнопки выбора типа
+            $keyboard = [
+                'keyboard' => [
+                    [['text' => 'Соискатель'], ['text' => 'Работодатель']],
+                ],
+                'resize_keyboard' => true,
+                'one_time_keyboard' => true,
+            ];
+
+            $this->telegramService->sendMessage($userId, "Выберите ваш тип:", $keyboard);
+            $user->save();
+            return true;
+        }
+
+        if ($user->state === 'ask_user_type' && empty($user->user_type)) {
+            if (!in_array(mb_strtolower($text), ['соискатель', 'работодатель'])) {
+                $this->telegramService->sendMessage($userId, "Пожалуйста, выберите корректный тип: 'Соискатель' или 'Работодатель'.");
+                return true;
+            }
+
+            $user->user_type = mb_strtolower($text) === 'соискатель' ? 'employee' : 'employer';
+            $user->state = $user->user_type === 'employee' ? 'ask_phone' : 'ask_position';
+            $user->save();
+
+            if ($user->user_type === 'employee') {
+                $this->telegramService->sendContactRequest($userId, "Пожалуйста, поделитесь своим номером телефона.");
+            } else {
+                $this->telegramService->sendMessage($userId, "Пожалуйста, введите вашу должность.");
+            }
+
+            return true;
+        }
+
+        return $this->handleFieldsByUserType($user, $text, $userId);
+    }
+    private function handleFieldsByUserType(User $user, string $text, int $userId): bool
+    {
+        // Поля для каждого типа пользователя
+        $employerFields = [
+            'position' => 'введите вашу должность',
+            'workplace' => 'введите ваше место работы',
+            'phone' => 'поделитесь своим номером телефона',
+            'email' => 'введите вашу электронную почту',
+        ];
+
+        $employeeFields = [
+            'phone' => 'поделитесь своим номером телефона',
+            'email' => 'введите вашу электронную почту',
+        ];
+
+        // Определяем, какие поля запрашивать
+        $requiredFields = $user->user_type === 'employer' ? $employerFields : $employeeFields;
+
+        // Обрабатываем поля по очереди
         foreach ($requiredFields as $field => $fieldPrompt) {
             if (empty($user->{$field})) {
-
-
+                // Если это поле "phone", всегда отправляем запрос с кнопкой
                 if ($field === 'phone') {
-                    $this->telegramService->sendContactRequest($userId, "Пожалуйста, поделитесь своим номером телефона");
-                    $user->state = $field;
-                    $user->save();
+                    if ($user->state !== 'phone') {
+                        // Запрашиваем контакт через кнопку
+                        $this->telegramService->sendContactRequest($userId, "Пожалуйста, {$fieldPrompt}.");
+                        $user->state = 'phone';
+                        $user->save();
+                    }
+                    // Ожидаем контактного ответа — не переходим к следующему шагу
                     return true;
                 }
+
+                // Для остальных полей проверяем формат и сохраняем
                 if (!$this->validateField($field, $text)) {
-                    $this->telegramService->sendMessage($userId, "Неверный формат данных");
+                    $this->telegramService->sendMessage($userId, "Неверный формат данных для поля '{$field}'.");
                     return true;
                 }
 
@@ -69,28 +129,32 @@ class UserService
                 $user->state = $field;
                 $user->save();
 
+                // Проверяем, есть ли еще пустые поля
                 $nextField = $this->getNextEmptyField($user, array_keys($requiredFields));
                 if ($nextField) {
                     if ($nextField === 'phone') {
-                        $this->telegramService->sendContactRequest($userId, "Пожалуйста, поделитесь своим номером телефона");
+                        $this->telegramService->sendContactRequest($userId, "Пожалуйста, {$requiredFields[$nextField]}.");
                     } else {
                         $this->telegramService->sendMessage($userId, "Пожалуйста, {$requiredFields[$nextField]}.");
                     }
                 } else {
+                    // Все данные собраны, авторизуем пользователя
                     $user->is_authed = true;
+                    $user->state = 'authorized';
+                    $user->daily_request_limit = 10;
                     $user->save();
-
-                    $this->checkPremiumAccess($user->email);
-
-                    $this->telegramService->sendMessage($userId, "Вы успешно авторизованы.");
-                    $this->telegramService->sendMessage($userId, "Можете задавать свои вопросы");
+                    $this->telegramService->sendMessage($userId, "Вы успешно авторизованы и можете задавать вопросы.");
                 }
+
                 return true;
             }
         }
 
         return false;
     }
+
+
+
     private function getNextEmptyField(User $user, array $fields): ?string
     {
         foreach ($fields as $field) {
